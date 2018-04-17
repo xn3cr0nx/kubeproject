@@ -88,6 +88,40 @@ Start using Google Cloud Engine
     --tags kubernetes-the-hard-way,worker
 done`
 
+## Components
+In the next chapter I'm going to creates certificates for etcd, kube-apiserver, kubelet, and kube-proxy. But it would be better to first understand what these components are.
+
+#### Master Components
+They provide the cluster's control plane, they make global decision about the cluster and detecting and responding to cluster events
+- kube-apiserver: component on the master that expos the k8s API ("frontend" for k8s control plane)
+- etcd: consistent and high-available key value store used as k8s' backing store for all cluster data
+- kube-scheduler: component on the master that watches newly created pods that have no node assigned and select a node for them to run on
+- kube-controller-manager: component on the master that runs controllers
+(*controllers*: a control loop that watched the shared state of the cluster though the apiserver and makes changes attempting to move the current state toward teh desired state)
+  - Node Controller: responsible for noticing and responding when nodes go down
+  - Replication Controller: responsible for maintaining the correct number of pods for every replication controller object in the system
+  - Endpoints Controller: populates the Endpoints object (joins Services & Pods)
+  - Service Account & Token Controller: creates default accounts and API access token for new namespaces
+- cloud-controller-manager: runs controller that interacts with the underlying cloud providers
+  - Node Controller: for checking the cloud provider to determine if a node has been deleted in the cloud after it stops responding
+  - Router Controller: for setting up routes in the underlying cloud infrastructure
+  - Service Controller: for creating, updating and deleting cloud provider load balancers
+  - Volume Controller: for creating, attaching, and mounting volumes, and interacting with the cloud provider to orchestrate volumes
+
+#### Node Components
+They run on every node, maintaining running pods and providing the k8s runtime environment
+- kubelet: it makes sure that containers are running in a pod
+- kube-proxy: enables the k8s service abstraction by maintaining network rules on the host and performing connection forwarding
+- Container Runtime: software responsible for running containers (eg. Docker, rkt..)
+
+#### Addons
+Pods and services that implement cluster features. Namespaced addon objects are created in the kube-system namespace
+- DNS: all k8s clusters should have cluster DNS. Cluster DNS is a DNS server, in addition to the other DNS server(s) in your environment, which serves DNS records for Kubernetes services
+- Web UI (Dashboard):  general purpose, web-based UI for k8s clusters
+- Container Resource Monitoring: records generic time-series metrics about containers in a central database, and provides a UI for browsing that data
+Cluster-level Logging: is responsible for saving container logs to a central log store with search/browsing interface. 
+
+
 ## Provisioning a CA and Generating TLS Certificates
 A public key infrastructure (PKI) is a set of roles, policies, and procedures needed to create, manage, distribute, use, store, and revoke digital certificates and manage public-key encryption.
 
@@ -108,7 +142,6 @@ Provision a CA that can be used to generate additional TLS certificates
   }
 }
 EOF`
-
 - Create the CA certificate signing request:
 `cat > ca-csr.json <<EOF
 {
@@ -129,9 +162,35 @@ EOF`
 }
 EOF
 `
-
-
-
+- Generate the CA certificate and private key `cfssl gencert -initca ca-csr.json | cfssljson -bare ca`
+- Create the admin client certificate signing request:
+`cat > admin-csr.json <<EOF
+{
+  "CN": "admin",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "US",
+      "L": "Portland",
+      "O": "system:masters",
+      "OU": "Kubernetes The Hard Way",
+      "ST": "Oregon"
+    }
+  ]
+}
+EOF
+`
+- Generate the admin client certificate and private key:
+`cfssl gencert \
+  -ca=ca.pem \
+  -ca-key=ca-key.pem \
+  -config=ca-config.json \
+  -profile=kubernetes \
+  admin-csr.json | cfssljson -bare admin
+`
 
 
 

@@ -57,7 +57,8 @@ Start using Google Cloud Engine
  - Remember you should have a compute/region set, if not use `gcloud config set compute/region europe-west1` && `gcloud config set compute/zone us-west1-a` for the zone
 
 - Create three compute instances which will host the Kubernetes control plane Controllers
-```for i in 0 1 2; do
+```
+for i in 0 1 2; do
   gcloud compute instances create controller-${i} \
     --async \
     --boot-disk-size 200GB \
@@ -73,7 +74,8 @@ Start using Google Cloud Engine
 ```
 
 - Each worker instance requires a pod subnet allocation from the Kubernetes cluster CIDR range
-```for i in 0 1 2; do
+```
+for i in 0 1 2; do
   gcloud compute instances create worker-${i} \
     --async \
     --boot-disk-size 200GB \
@@ -128,7 +130,8 @@ A public key infrastructure (PKI) is a set of roles, policies, and procedures ne
 
 Provision a CA that can be used to generate additional TLS certificates
 - Create CA configuration file: 
-```cat > ca-config.json <<EOF
+```
+cat > ca-config.json <<EOF
 {
   "signing": {
     "default": {
@@ -144,7 +147,8 @@ Provision a CA that can be used to generate additional TLS certificates
 }
 EOF```
 - Create the CA certificate signing request:
-```cat > ca-csr.json <<EOF
+```
+cat > ca-csr.json <<EOF
 {
   "CN": "Kubernetes",
   "key": {
@@ -165,7 +169,8 @@ EOF
 ```
 - Generate the CA certificate and private key `cfssl gencert -initca ca-csr.json | cfssljson -bare ca`
 - Create the admin client certificate signing request:
-```cat > admin-csr.json <<EOF
+```
+cat > admin-csr.json <<EOF
 {
   "CN": "admin",
   "key": {
@@ -185,7 +190,8 @@ EOF
 EOF
 ```
 - Generate the admin client certificate and private key:
-```cfssl gencert \
+```
+cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
@@ -193,7 +199,8 @@ EOF
   admin-csr.json | cfssljson -bare admin
 ```
 - Generate a certificate and private key for each Kubernetes worker node:
-```for instance in worker-0 worker-1 worker-2; do
+```
+for instance in worker-0 worker-1 worker-2; do
   cat > ${instance}-csr.json <<EOF
   {
     "CN": "system:node:${instance}",
@@ -228,7 +235,8 @@ EOF
 API requests made by kubelet are authorized by a special-purpose authorization mode called *Node Authorizer*. In order to be authorized by the Node Authorizer, Kubelets must use a credential that identifies them as being in the system:nodes group, with a username of system:node:`<nodeName>`
 
 - Create the kube-proxy client certificate signing request:
-```cat > kube-proxy-csr.json <<EOF
+```
+cat > kube-proxy-csr.json <<EOF
 {
   "CN": "system:kube-proxy",
   "key": {
@@ -250,7 +258,8 @@ EOF
 - Generate the kube-proxy client certificate and private key: `cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy`
 - Retrieve the kubernetes-the-hard-way static IP address: `KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way --region $(gcloud config get-value compute/region) --format 'value(address)')`
 - Create the Kubernetes API Server certificate signing request:
-```cat > kubernetes-csr.json <<EOF
+```
+cat > kubernetes-csr.json <<EOF
 {
   "CN": "kubernetes",
   "key": {
@@ -270,7 +279,8 @@ EOF
 EOF
 ```
 - Generate the Kubernetes API Server certificate and private key:
-```cfssl gencert \
+```
+cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
@@ -279,17 +289,60 @@ EOF
   kubernetes-csr.json | cfssljson -bare kubernetes
 ```
 - Copy the appropriate certificates and private keys to each worker instance:
-```for instance in worker-0 worker-1 worker-2; do
+```
+for instance in worker-0 worker-1 worker-2; do
   gcloud compute scp ca.pem ${instance}-key.pem ${instance}.pem ${instance}:~/
 done
 ```
 - Copy the appropriate certificates and private keys to each controller instance:
-```for instance in controller-0 controller-1 controller-2; do
+```
+for instance in controller-0 controller-1 controller-2; do
   gcloud compute scp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem ${instance}:~/
 done
 ```
 
+## Generating Kubernetes Configuration Files for Authentication
+- Retrieve public static IP address: `KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses list | grep kubernetes-the-hard-way | awk '{print $3}' | sed -n 2p)`
+- Generate a kubeconfig file for each worker node (kubelet config file):
+```
+for instance in worker-0 worker-1 worker-2; do
+  kubectl config set-cluster kubernetes-the-hard-way \
+    --certificate-authority=ca.pem \
+    --embed-certs=true \
+    --server=https://${KUBERNETES_PUBLIC_ADDRESS}:6443 \
+    --kubeconfig=${instance}.kubeconfig
 
+  kubectl config set-credentials system:node:${instance} \
+    --client-certificate=${instance}.pem \
+    --client-key=${instance}-key.pem \
+    --embed-certs=true \
+    --kubeconfig=${instance}.kubeconfig
+
+  kubectl config set-context default \
+    --cluster=kubernetes-the-hard-way \
+    --user=system:node:${instance} \
+    --kubeconfig=${instance}.kubeconfig
+
+  kubectl config use-context default --kubeconfig=${instance}.kubeconfig
+done
+```
+- Generate a kubeconfig file for the kube-proxy service:
+`kubectl config set-cluster kubernetes-the-hard-way --certificate-authority=ca.pem --embed-certs=true --server=https://${KUBERNETES_PUBLIC_ADDRESS}:6443 --kubeconfig=kube-proxy.kubeconfig`
+
+`kubectl config set-credentials kube-proxy --client-certificate=kube-proxy.pem --client-key=kube-proxy-key.pem  --embed-certs=true --kubeconfig=kube-proxy.kubeconfig`
+
+`kubectl config set-context default --cluster=kubernetes-the-hard-way --user=kube-proxy --kubeconfig=kube-proxy.kubeconfig`
+
+`kubectl config use-context default --kubeconfig=kube-proxy.kubeconfig` 
+
+- Copy the appropriate kubelet and kube-proxy kubeconfig files to each worker instance:
+```
+for instance in worker-0 worker-1 worker-2; do
+  gcloud compute scp ${instance}.kubeconfig kube-proxy.kubeconfig ${instance}:~/
+done
+```
+
+## Generating the Data Encryption Config and Key
 
 
 

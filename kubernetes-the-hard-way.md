@@ -623,7 +623,7 @@ sudo mkdir -p \
 /var/lib/kubelet \
 /var/lib/kube-proxy \
 /var/lib/kubernetes \
-/var/run/kubernetes`
+/var/run/kubernetes
 ```
 - Install the worker binaries: 
   - `sudo tar -xvf cni-plugins-amd64-v0.6.0.tgz -C /opt/cni/bin/`
@@ -663,9 +663,9 @@ EOF
 ```
 - Move the network configuration files to the CNI configuration directory: `sudo mv 10-bridge.conf 99-loopback.conf /etc/cni/net.d/`
 - Configure the Kubelet:
-  - sudo mv ${HOSTNAME}-key.pem ${HOSTNAME}.pem /var/lib/kubelet/
-  - sudo mv ${HOSTNAME}.kubeconfig /var/lib/kubelet/kubeconfig
-  - sudo mv ca.pem /var/lib/kubernetes/
+  - `sudo mv ${HOSTNAME}-key.pem ${HOSTNAME}.pem /var/lib/kubelet/`
+  - `sudo mv ${HOSTNAME}.kubeconfig /var/lib/kubelet/kubeconfig`
+  - `sudo mv ca.pem /var/lib/kubernetes/`
 - Create the kubelet.service systemd unit file:
 ```
 cat > kubelet.service <<EOF
@@ -724,12 +724,11 @@ WantedBy=multi-user.target
 EOF
 ```
 - Start the Worker Services:
-  - sudo mv kubelet.service kube-proxy.service /etc/systemd/system/
-  - sudo systemctl daemon-reload
-  - sudo systemctl enable containerd cri-containerd kubelet kube-proxy 
-  - sudo systemctl start containerd cri-containerd kubelet kube-proxy
+  - `sudo mv kubelet.service kube-proxy.service /etc/systemd/system/`
+  - `sudo systemctl daemon-reload`
+  - `sudo systemctl enable containerd cri-containerd kubelet kube-proxy` 
+  - `sudo systemctl start containerd cri-containerd kubelet kube-proxy`
 - Verify procedure, inside a controller: `kubectl get nodes`
-
 
 
 

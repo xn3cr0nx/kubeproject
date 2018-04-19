@@ -536,6 +536,200 @@ EOF
 
 - Verify the status of components: `kubectl get componentstatuses`
 
+### RBAC for Kubelet Authorization
+Configuring RBAC permissions to allow the Kubernetes API Server to access the Kubelet API on each worker node. This is required for retrieving metrics, logs, and executing commands in pods.
+For each controller:
+- Create the *system:kube-apiserver-to-kubelet* **ClusterRole**:
+```
+cat <<EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: system:kube-apiserver-to-kubelet
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/proxy
+      - nodes/stats
+      - nodes/log
+      - nodes/spec
+      - nodes/metrics
+    verbs:
+      - "*"
+EOF
+```
+- Bind the system:kube-apiserver-to-kubelet ClusterRole to the kubernetes user:
+```
+cat <<EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: system:kube-apiserver
+  namespace: ""
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:kube-apiserver-to-kubelet
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: kubernetes
+EOF
+```
+
+### The Kubernetes Frontend Load Balancer
+Provisioning an external load balancer to front the Kubernetes API Servers
+- Create the external load balancer network resources: 
+  - `gcloud compute target-pools create kubernetes-target-pool`
+  - `gcloud compute target-pools add-instances kubernetes-target-pool --instances controller-0,controller-1,controller-2`
+  - `KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way
+ --region $(gcloud config get-value compute/region) --format 'value(name)')`
+  - `gcloud compute forwarding-rules create kubernetes-forwarding-rule \
+  --address ${KUBERNETES_PUBLIC_ADDRESS} \
+  --ports 6443 \
+  --region $(gcloud config get-value compute/region) \
+  --target-pool kubernetes-target-pool`
+- Verify the successful of operation:
+  - Retriev the public IP: `KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
+  --region $(gcloud config get-value compute/region) \
+  --format 'value(address)')`
+  - Make a HTTP request for the Kubernetes version info: `curl --cacert ca.pem https://${KUBERNETES_PUBLIC_ADDRESS}:6443/version`
+
+
+## Bootstrapping the Kubernetes Worker Nodes
+The following components will be installed on each node: runc, container networking plugins, cri-containerd, kubelet, and kube-proxy.
+For each worker:
+- Install the OS dependencies: `sudo apt-get -y install socat`
+Socat  is a command line based utility that establishes two bidirectional byte streams and transfers data between them. The socat binary enables support for the kubectl port-forward command.
+- Download worker binaries: 
+```
+wget -q --show-progress --https-only --timestamping \
+  https://github.com/containernetworking/plugins/releases/download/v0.6.0/cni-plugins-amd64-v0.6.0.tgz \
+  https://github.com/containerd/cri-containerd/releases/download/v1.0.0-beta.1/cri-containerd-1.0.0-beta.1.linux-amd64.tar.gz \
+  https://storage.googleapis.com/kubernetes-release/release/v1.9.0/bin/linux/amd64/kubectl \
+  https://storage.googleapis.com/kubernetes-release/release/v1.9.0/bin/linux/amd64/kube-proxy \
+  https://storage.googleapis.com/kubernetes-release/release/v1.9.0/bin/linux/amd64/kubelet
+```
+- Create the installation directories: 
+```
+sudo mkdir -p \
+/etc/cni/net.d \
+/opt/cni/bin \
+/var/lib/kubelet \
+/var/lib/kube-proxy \
+/var/lib/kubernetes \
+/var/run/kubernetes`
+```
+- Install the worker binaries: 
+  - `sudo tar -xvf cni-plugins-amd64-v0.6.0.tgz -C /opt/cni/bin/`
+  - `sudo tar -xvf cri-containerd-1.0.0-beta.1.linux-amd64.tar.gz -C /`
+  - `chmod +x kubectl kube-proxy kubelet`
+  - `sudo mv kubectl kube-proxy kubelet /usr/local/bin/`
+
+- Configure CNI Networking retrieving the Pod CIDR range for the current compute instance: `POD_CIDR=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/pod-cidr)`
+- Create the bridge network configuration file:
+```
+cat > 10-bridge.conf <<EOF
+{
+    "cniVersion": "0.3.1",
+    "name": "bridge",
+    "type": "bridge",
+    "bridge": "cnio0",
+    "isGateway": true,
+    "ipMasq": true,
+    "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [{"subnet": "${POD_CIDR}"}]
+        ],
+        "routes": [{"dst": "0.0.0.0/0"}]
+    }
+}
+EOF
+```
+- Create the loopback network configuration file:
+```
+cat > 99-loopback.conf <<EOF
+{
+    "cniVersion": "0.3.1",
+    "type": "loopback"
+}
+EOF
+```
+- Move the network configuration files to the CNI configuration directory: `sudo mv 10-bridge.conf 99-loopback.conf /etc/cni/net.d/`
+- Configure the Kubelet:
+  - sudo mv ${HOSTNAME}-key.pem ${HOSTNAME}.pem /var/lib/kubelet/
+  - sudo mv ${HOSTNAME}.kubeconfig /var/lib/kubelet/kubeconfig
+  - sudo mv ca.pem /var/lib/kubernetes/
+- Create the kubelet.service systemd unit file:
+```
+cat > kubelet.service <<EOF
+[Unit]
+Description=Kubernetes Kubelet
+Documentation=https://github.com/kubernetes/kubernetes
+After=cri-containerd.service
+Requires=cri-containerd.service
+
+[Service]
+ExecStart=/usr/local/bin/kubelet \\
+  --allow-privileged=true \\
+  --anonymous-auth=false \\
+  --authorization-mode=Webhook \\
+  --client-ca-file=/var/lib/kubernetes/ca.pem \\
+  --cloud-provider= \\
+  --cluster-dns=10.32.0.10 \\
+  --cluster-domain=cluster.local \\
+  --container-runtime=remote \\
+  --container-runtime-endpoint=unix:///var/run/cri-containerd.sock \\
+  --image-pull-progress-deadline=2m \\
+  --kubeconfig=/var/lib/kubelet/kubeconfig \\
+  --network-plugin=cni \\
+  --pod-cidr=${POD_CIDR} \\
+  --register-node=true \\
+  --runtime-request-timeout=15m \\
+  --tls-cert-file=/var/lib/kubelet/${HOSTNAME}.pem \\
+  --tls-private-key-file=/var/lib/kubelet/${HOSTNAME}-key.pem \\
+  --v=2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+- Configure the Kubernetes Proxy: `sudo mv kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig`
+- Create the kube-proxy.service systemd unit file:
+```
+cat > kube-proxy.service <<EOF
+[Unit]
+Description=Kubernetes Kube Proxy
+Documentation=https://github.com/kubernetes/kubernetes
+
+[Service]
+ExecStart=/usr/local/bin/kube-proxy \\
+  --cluster-cidr=10.200.0.0/16 \\
+  --kubeconfig=/var/lib/kube-proxy/kubeconfig \\
+  --proxy-mode=iptables \\
+  --v=2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+- Start the Worker Services:
+  - sudo mv kubelet.service kube-proxy.service /etc/systemd/system/
+  - sudo systemctl daemon-reload
+  - sudo systemctl enable containerd cri-containerd kubelet kube-proxy 
+  - sudo systemctl start containerd cri-containerd kubelet kube-proxy
+- Verify procedure, inside a controller: `kubectl get nodes`
+
 
 
 

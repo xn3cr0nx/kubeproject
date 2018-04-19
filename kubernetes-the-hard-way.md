@@ -758,4 +758,26 @@ Generating a kubeconfig file for the kubectl command line utility based on the a
   - `kubectl get componentstatuses`
   - `kubectl get nodes`
 
-
+## Provisioning Pod Network Routes
+CIDR (Classless Inter-Domain Routing): is a method for allocating IP addresses and IP routing
+Pods scheduled to a node receive an IP from node's Pod CIDR range, but they cannot communicate with other pods running on other node due to missing network routes.
+A route is a mapping of an IP range to a destination. Routes tell the VPC network where to send packets destined for a particular IP address.
+The third chapter Implementations explains all the ways to implement a network route.
+- To gather the information required to create routes in the kubernetes-the-hard-way VPC network print the internal IP address and Pod CIDR range for each worker instance:
+```
+for instance in worker-0 worker-1 worker-2; do
+  gcloud compute instances describe ${instance} \
+    --format 'value[separator=" "](networkInterfaces[0].networkIP,metadata.items[0].value)'
+done
+```
+The Routing Table
+- Create network routes for each worker instance:
+```
+for i in 0 1 2; do
+  gcloud compute routes create kubernetes-route-10-200-${i}-0-24 \
+    --network kubernetes-the-hard-way \
+    --next-hop-address 10.240.0.2${i} \
+    --destination-range 10.200.${i}.0/24
+done
+```
+- List the routes in the kubernetes-the-hard-way VPC network: `gcloud compute routes list --filter "network: kubernetes-the-hard-way"`

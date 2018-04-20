@@ -829,3 +829,5 @@ A Secret is an object that contains a small amount of sensitive data such as a p
 - Retrieve the external IP address of a worker instance: `EXTERNAL_IP=$(gcloud compute instances describe worker-0 
 --format 'value(networkInterfaces[0].accessConfigs[0].natIP)')` this will return the external IP of the worker where the pod is running
 - Make an HTTP request using the external IP address and the nginx node port: `curl -I http://${EXTERNAL_IP}:${NODE_PORT}` In the browser you will find the welcome to nginx! page
+
+# Kubernetes The Easy Way

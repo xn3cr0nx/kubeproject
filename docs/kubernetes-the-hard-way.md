@@ -15,6 +15,7 @@ Containers within a Pod share their network namespaces including IP address => "
 Docker is a "pod container" which holds the network namespace open while "app containers" join that namespace with Docker's --net=container:<id> function
 
 ### Implementations (A lot of solutions)
+The Container Network Interface (CNI) defines how the different nodes and their workloads should communicate
 SDN = software-defined networking, novel approach to cloud computing that facilitates network management
 - ACI: (Cisco Apoplication Centric Infrastructure) intergrated overlay and undelay SDN solution that supports containers, VMs and bare metal servers
 - Big Cloud Fabric from Big Switch Networks: cloud native networking architecture, designed to run Kubernetes in private cloud/on-premise environments. With this is possible to connect container orchestration system (k8s, openshift, swarm..) along side with VM orchestration system (VMware, openstack..)
@@ -829,5 +830,3 @@ A Secret is an object that contains a small amount of sensitive data such as a p
 - Retrieve the external IP address of a worker instance: `EXTERNAL_IP=$(gcloud compute instances describe worker-0 
 --format 'value(networkInterfaces[0].accessConfigs[0].natIP)')` this will return the external IP of the worker where the pod is running
 - Make an HTTP request using the external IP address and the nginx node port: `curl -I http://${EXTERNAL_IP}:${NODE_PORT}` In the browser you will find the welcome to nginx! page
-
-# Kubernetes The Easy Way

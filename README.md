@@ -6,7 +6,7 @@ I'm going to split different techniques explanation across different docs.
 - The provisioning and building of the cluster is explained in decreasing difficulty across these files:
 	- [kubernetes-the-hard-way](https://github.com/xn3cr0nx/kubeproject/blob/master/docs/kubernetes-the-hard-way.md)
 	- [kubernetes-the-kubeadm-way](https://github.com/xn3cr0nx/kubeproject/blob/master/docs/kubernetes-the-kubeadm-way.md)
-	- kubernetes-the-kubespray-way
+	- [kubernetes-the-kubespray-way](https://github.com/xn3cr0nx/kubeproject/blob/master/docs/kubernetes-the-kubespray-way.md)
 	- kubernetes-the-kargo-way
 	- kubernetes-the-easy-way
 

@@ -68,3 +68,29 @@ kube-master
 Kubespray will install kubernetes-api-server, etcd (key-value store), controller, Scheduler will be installed on master machines and kubelet, kube-proxy and Docker (or rkt) will be installed on node machines (minions). These all components will be installed and configured by ansible roles in kubespray. All, We need to do is to execute one command.
 - Start deploying: `kubespray deploy`
 > This process takes really long, up to 20 minutes
+
+## Connect kubectl to the cluster
+You need to set the context and have the certificates on your client to communicate with the cluster
+- Get the cert from master:
+```
+mkdir kubectl
+ssh root@master1_ip sudo cat /etc/kubernetes/ssl/admin-machine-0.pem > kubectl/admin-machine-0.pem
+ssh root@master1_ip sudo cat /etc/kubernetes/ssl/admin-machine-0-key.pem > kubectl/admin-machine-0-key.pem
+ssh root@master1_ip sudo cat /etc/kubernetes/ssl/ca.pem > kubectl/ca.pem
+```
+- Configure kubectl:
+```
+kubectl config set-cluster kubespray --server=https://master1_ip:6443 --certificate-authority=kubectl/ca.pem
+
+kubectl config set-credentials kadmin \
+    --certificate-authority=kubectl/ca.pem \
+    --client-key=kubectl/admin-machine-0-key.pem \
+    --client-certificate=kubectl/admin-machine-0.pem  
+
+kubectl config set-context kubespray --cluster=kubespray --user=kadmin
+kubectl config use-context kubespray
+
+kubectl get node
+kubectl get all --all-namespaces
+```
+> Check from the master that the secure port for the api is *6443* with `kubectl describe po/kube-apiserver-machine-0`

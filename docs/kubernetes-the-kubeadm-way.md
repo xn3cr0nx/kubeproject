@@ -25,7 +25,7 @@ gcloud compute instances create master \
   --private-network-ip 10.240.0.10 \
   --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
   --subnet kubernetes \
-  --tags kubernetes-the-hard-way,controller
+  --tags kubernetes-the-kubeadm-way,controller
 ```
 - Create workers: 
 ```
@@ -41,7 +41,7 @@ for i in 1 2; do
     --private-network-ip 10.240.0.2${i} \
     --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
     --subnet kubernetes \
-    --tags kubernetes-the-hard-way,worker
+    --tags kubernetes-the-kubeadm-way,worker
 done
 ```
 

@@ -94,3 +94,9 @@ kubectl get node
 kubectl get all --all-namespaces
 ```
 > Check from the master that the secure port for the api is *6443* with `kubectl describe po/kube-apiserver-machine-0`
+
+
+
+
+test sample application `kubectl create namespace sock-shop`
+`kubectl apply -n sock-shop -f "https://github.com/microservices-demo/microservices-demo/blob/master/deploy/kubernetes/complete-demo.yaml?raw=true"`

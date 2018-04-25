@@ -7,7 +7,6 @@ I'm going to split different techniques explanation across different docs.
 	- [kubernetes-the-hard-way](https://github.com/xn3cr0nx/kubeproject/blob/master/docs/kubernetes-the-hard-way.md)
 	- [kubernetes-the-kubeadm-way](https://github.com/xn3cr0nx/kubeproject/blob/master/docs/kubernetes-the-kubeadm-way.md)
 	- [kubernetes-the-kubespray-way](https://github.com/xn3cr0nx/kubeproject/blob/master/docs/kubernetes-the-kubespray-way.md)
-	- kubernetes-the-kargo-way
 	- kubernetes-the-easy-way
 
 - After the provisioning I'm going to create a sample application running in Docker containers:

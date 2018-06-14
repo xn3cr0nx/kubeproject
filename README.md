@@ -15,10 +15,7 @@ I'm going to split different techniques explanation across different docs.
   * [kubernetes-the-kubeadm-way](https://github.com/xn3cr0nx/kubeproject/blob/master/docs/kubernetes-the-kubeadm-way.md)
   * [kubernetes-the-kubespray-way](https://github.com/xn3cr0nx/kubeproject/blob/master/docs/kubernetes-the-kubespray-way.md)
 
-* After the provisioning I'm going to create a sample application running in Docker containers:
+* After the provisioning I'm going to create a sample WordPress website running in Docker containers:
 
-  * containerizing-the-app
-
-* Deploying of the application and configuration of logging and monitoring addons via different ways:
-  * deploying-from-scratch
-  * deploying-with-helm-charts
+  * [Helm](https://github.com/xn3cr0nx/kubeproject/blob/master/docs/helm.md)
+  * [Deploying WordPress with Helm](https://github.com/xn3cr0nx/kubeproject/blob/master/docs/deploying-wordpress-with-helm.md)

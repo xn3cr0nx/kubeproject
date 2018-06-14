@@ -98,6 +98,8 @@ ssh root@master1_ip sudo cat /etc/kubernetes/ssl/admin-machine-0-key.pem > kubec
 ssh root@master1_ip sudo cat /etc/kubernetes/ssl/ca.pem > kubectl/ca.pem
 ```
 
+> get ip of the instance with this command and substitute to master1_ip `$(doctl compute d ls | grep master_1 | awk '{print $3}')` to  `master1_ip`
+
 * Configure kubectl:
 
 ```bash

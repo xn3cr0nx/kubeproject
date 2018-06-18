@@ -34,6 +34,9 @@ To visit the website you need to catch the ip:
 `export NODE_IP=$(kubectl get nodes --namespace wordpress -o jsonpath="{.items[0].status.addresses[0].address}")`  
 `echo http://$NODE_IP:$NODE_PORT/admin`
 
+In the end you should have a result like this (obtained with `kubectl get all --all-namespaces`:
+![Final Result](/assets/final_result.png)
+
 ## Scaling
 
 Scaling your microservices is really easy. For example:  
